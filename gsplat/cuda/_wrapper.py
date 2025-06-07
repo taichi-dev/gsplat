@@ -1446,9 +1446,13 @@ class _RasterizeToPixelsEval3D(torch.autograd.Function):
         camera_model_type = ctx.camera_model_type
         tile_size = ctx.tile_size
 
-        (v_means, v_quats, v_scales, v_colors, v_opacities,) = _make_lazy_cuda_func(
-            "rasterize_to_pixels_from_world_3dgs_bwd"
-        )(
+        (
+            v_means,
+            v_quats,
+            v_scales,
+            v_colors,
+            v_opacities,
+        ) = _make_lazy_cuda_func("rasterize_to_pixels_from_world_3dgs_bwd")(
             means,
             quats,
             scales,
@@ -2508,7 +2512,7 @@ class _RasterizeToPixels2DGS(torch.autograd.Function):
             v_render_median.contiguous(),
             absgrad,
         )
-        torch.cuda.synchronize()
+        # torch.cuda.current_stream(v_render_colors.device).synchronize()
         if absgrad:
             means2d.absgrad = v_means2d_abs
 
