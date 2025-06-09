@@ -2512,7 +2512,7 @@ class _RasterizeToPixels2DGS(torch.autograd.Function):
             v_render_median.contiguous(),
             absgrad,
         )
-        torch.cuda.current_stream(v_render_colors.device).synchronize()
+        # torch.cuda.current_stream(v_render_colors.device).synchronize()
         if absgrad:
             means2d.absgrad = v_means2d_abs
 
