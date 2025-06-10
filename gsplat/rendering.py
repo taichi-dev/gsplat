@@ -1208,6 +1208,15 @@ def rasterization_inria_wrapper(
                 else torch.zeros(3, device=device)
             )
 
+            if world_view_transform.device != device:
+                world_view_transform = world_view_transform.to(
+                    device=device, non_blocking=True
+                )
+            if full_proj_transform.device != device:
+                full_proj_transform = full_proj_transform.to(
+                    device=device, non_blocking=True
+                )
+
             raster_settings = GaussianRasterizationSettings(
                 image_height=height,
                 image_width=width,
@@ -1392,6 +1401,11 @@ def rasterization_2dgs(
     device = means.device
     channels = colors.shape[-1]
 
+    camtoworlds = torch.linalg.inv(viewmats)  # [..., C, 4, 4]
+    if viewmats.device != device:
+        viewmats = viewmats.to(device=device, non_blocking=True)
+        camtoworlds = camtoworlds.to(device=device, non_blocking=True)
+
     assert means.shape == batch_dims + (N, 3), means.shape
     assert quats.shape == batch_dims + (N, 4), quats.shape
     assert scales.shape == batch_dims + (N, 3), scales.shape
@@ -1503,7 +1517,6 @@ def rasterization_2dgs(
     #     if packed:
     #         colors = colors.view(B, C, N, -1)[batch_ids, camera_ids, gaussian_ids, :]
     if sh_degree is not None:  # SH coefficients
-        camtoworlds = torch.inverse(viewmats)
         if packed:
             dirs = means[..., gaussian_ids, :] - camtoworlds[..., camera_ids, :3, 3]
         else:
@@ -1577,7 +1590,7 @@ def rasterization_2dgs(
             depth_for_normal = render_median
 
         render_normals_from_depth = depth_to_normal(
-            depth_for_normal, torch.linalg.inv(viewmats), Ks
+            depth_for_normal, camtoworlds, Ks
         ).squeeze(0)
 
     meta = {
@@ -1604,7 +1617,7 @@ def rasterization_2dgs(
     }
 
     render_normals = torch.einsum(
-        "...ij,...hwj->...hwi", torch.linalg.inv(viewmats)[..., :3, :3], render_normals
+        "...ij,...hwj->...hwi", camtoworlds[..., :3, :3], render_normals
     )
 
     return (
@@ -1667,7 +1680,7 @@ def rasterization_2dgs_inria_wrapper(
 
         world_view_transform = viewmats[cid].transpose(0, 1)
         projection_matrix = get_projection_matrix(
-            znear=near_plane, zfar=far_plane, fovX=FoVx, fovY=FoVy, device=device
+            znear=near_plane, zfar=far_plane, fovX=FoVx, fovY=FoVy
         ).transpose(0, 1)
         full_proj_transform = (
             world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))
@@ -1679,6 +1692,15 @@ def rasterization_2dgs_inria_wrapper(
             if backgrounds is not None
             else torch.zeros(3, device=device)
         )
+
+        if world_view_transform.device != device:
+            world_view_transform = world_view_transform.to(
+                device=device, non_blocking=True
+            )
+        if full_proj_transform.device != device:
+            full_proj_transform = full_proj_transform.to(
+                device=device, non_blocking=True
+            )
 
         raster_settings = GaussianRasterizationSettings(
             image_height=height,
